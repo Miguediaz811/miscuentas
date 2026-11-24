@@ -281,3 +281,11 @@ svg text { font-family: inherit; }
 .leyenda-semaforo { display: flex; gap: .9rem; font-size: .78rem; color: var(--suave); }
 .leyenda-semaforo span { display: inline-flex; align-items: center; gap: .3rem; }
 .leyenda-semaforo i { width: 9px; height: 9px; border-radius: 50%; }
+
+/* ---------- Leyenda agrupada de la distribución ---------- */
+#leyendaDistribucion { gap: .3rem; font-size: .8rem; max-height: 300px; overflow-y: auto; }
+#leyendaDistribucion li { grid-template-columns: auto 1fr auto; }
+#leyendaDistribucion li span small { color: var(--suave); margin-left: .25rem; grid-column: auto; }
+#leyendaDistribucion b { font-weight: 600; white-space: nowrap; }
+.leyenda-grupo { display: block !important; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); margin-top: .45rem; }
+.leyenda-grupo:first-child { margin-top: 0; }

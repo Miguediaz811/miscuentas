@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mis Cuentas · Dashboard</title>
   <meta name="theme-color" content="#1e40af">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=7">
   <script>try{var t=localStorage.getItem("mis-cuentas-tema");document.documentElement.dataset.theme=t||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){}</script>
 </head>
 <body>
@@ -42,9 +42,9 @@
       </article>
 
       <article class="card">
-        <div class="card-head"><h2>Distribución del neto</h2></div>
+        <div class="card-head"><h2>Distribución del salario</h2></div>
         <div class="donut-wrap">
-          <svg id="chartDistribucion" viewBox="0 0 200 200" role="img" aria-label="Distribución del neto por bolsillo"></svg>
+          <svg id="chartDistribucion" viewBox="0 0 200 200" role="img" aria-label="Devengados, deducciones y bolsillos"></svg>
           <ul id="leyendaDistribucion" class="leyenda"></ul>
         </div>
       </article>
@@ -151,6 +151,6 @@
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

@@ -20,6 +20,11 @@
   const NOMBRES_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
     'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
+  const TONOS_NOMINA = {
+    devengado: ['#1e3a8a', '#93c5fd', '#3b5bdb', '#c7d2fe'],
+    deduccion: ['#dc2626', '#f87171', '#b91c1c', '#fca5a5'],
+  };
+
   // Conceptos del desprendible de nómina (se usan para cargar meses nuevos)
   const NOMINA_INICIAL = [
     { nombre: 'Apoyo de sostenimiento', tipo: 'devengado', monto: 1750905 },
@@ -136,7 +141,7 @@
     const t = totalesNomina(mes);
     const comp = (mes.conceptos || []).filter((c) => c.monto > 0);
     const totalComp = comp.reduce((s2, c) => s2 + c.monto, 0) || 1;
-    const tonos = { devengado: ['#2563eb', '#0ea5e9', '#60a5fa', '#bae6fd'], deduccion: ['#f97316', '#fb923c', '#fdba74', '#fed7aa'] };
+    const tonos = TONOS_NOMINA;
     const idx = { devengado: 0, deduccion: 0 };
     const segs = comp.map((c) => {
       const k = c.tipo === 'deduccion' ? 'deduccion' : 'devengado';
@@ -293,28 +298,54 @@
     }).join('');
   }
 
+  // Dos anillos: exterior = de dónde sale la plata (devengados);
+  // interior = a dónde va (deducciones, bolsillos y lo que queda sin asignar).
   function renderDistribucion() {
-    const neto = netoMes(leerMes(mesActual));
-    const partes = state.bolsillos.map((b) => ({ nombre: b.nombre, color: b.color, monto: asignadoDe(b, neto) }));
-    const libre = neto - partes.reduce((s, p) => s + p.monto, 0);
-    if (libre >= 1) partes.push({ nombre: 'Sin asignar', color: '#9ca3af', monto: libre });
-    const total = partes.reduce((s, p) => s + p.monto, 0) || 1;
-    partes.forEach((p) => { p.pct = neto ? Math.round((p.monto / neto) * 1000) / 10 : 0; });
-    let off = 0;
-    const arcos = partes.map((p) => {
-      const len = (p.monto / total) * 100;
-      const seg = `<circle cx="100" cy="100" r="72" fill="none" stroke="${escapar(p.color)}" stroke-width="28"
-        pathLength="100" stroke-dasharray="${Math.max(0, len - 0.8)} ${100 - Math.max(0, len - 0.8)}" stroke-dashoffset="${-off}"
-        transform="rotate(-90 100 100)"><title>${escapar(p.nombre)}: ${p.pct}%</title></circle>`;
-      off += len;
-      return seg;
-    }).join('');
-    $('chartDistribucion').innerHTML = `${arcos}
-      <text x="100" y="98" text-anchor="middle" font-size="24" font-weight="800" class="svg-txt">${fmtCorto(neto)}</text>
-      <text x="100" y="118" text-anchor="middle" class="eje">neto</text>`;
-    $('leyendaDistribucion').innerHTML = partes.map((p) => `
-      <li><i style="background:${escapar(p.color)}"></i><span>${escapar(p.nombre)}</span><b>${p.pct}%</b>
-      <small>${fmt(p.monto)}</small></li>`).join('');
+    const mes = leerMes(mesActual);
+    const t = totalesNomina(mes);
+    const conceptos = (Array.isArray(mes.conceptos) ? mes.conceptos : [{ nombre: 'Salario', tipo: 'devengado', monto: mes.salario || 0 }])
+      .filter((c) => c.monto > 0);
+    const idx = { devengado: 0, deduccion: 0 };
+    const tono = (tipo) => TONOS_NOMINA[tipo][idx[tipo]++ % 4];
+
+    const devengados = conceptos.filter((c) => c.tipo !== 'deduccion')
+      .map((c) => ({ nombre: c.nombre || 'Devengado', monto: c.monto, color: tono('devengado') }));
+    const deducciones = conceptos.filter((c) => c.tipo === 'deduccion')
+      .map((c) => ({ nombre: c.nombre || 'Deducción', monto: c.monto, color: tono('deduccion') }));
+    const bolsillos = state.bolsillos.map((b) => ({ nombre: b.nombre, color: b.color, monto: asignadoDe(b, t.neto) }));
+    const libre = t.neto - bolsillos.reduce((s2, p) => s2 + p.monto, 0);
+    const destino = [...deducciones, ...bolsillos];
+    if (libre >= 1) destino.push({ nombre: 'Sin asignar', color: '#9ca3af', monto: libre });
+
+    const anilloSvg = (partes, r, grosor) => {
+      const total = partes.reduce((s2, p) => s2 + p.monto, 0);
+      if (!total) return `<circle cx="100" cy="100" r="${r}" fill="none" class="svg-track" stroke-width="${grosor}"/>`;
+      let off = 0;
+      return partes.map((p) => {
+        const len = (p.monto / total) * 100;
+        const vis = Math.max(0, len - (partes.length > 1 ? 0.6 : 0));
+        const seg = `<circle cx="100" cy="100" r="${r}" fill="none" stroke="${escapar(p.color)}" stroke-width="${grosor}"
+          pathLength="100" stroke-dasharray="${vis} ${100 - vis}" stroke-dashoffset="${-off}"
+          transform="rotate(-90 100 100)"><title>${escapar(p.nombre)}: ${fmt(p.monto)}</title></circle>`;
+        off += len;
+        return seg;
+      }).join('');
+    };
+
+    $('chartDistribucion').innerHTML = `
+      ${anilloSvg(devengados, 88, 12)}
+      ${anilloSvg(destino, 64, 26)}
+      <text x="100" y="97" text-anchor="middle" font-size="20" font-weight="800" class="svg-txt">${fmtCorto(t.devengado)}</text>
+      <text x="100" y="114" text-anchor="middle" class="eje">devengado</text>`;
+
+    const pctNeto = (m) => (t.neto ? ` <small>${Math.round((m / t.neto) * 1000) / 10}%</small>` : '');
+    const fila = (p, signo, extra = '') => `<li><i style="background:${escapar(p.color)}"></i><span>${escapar(p.nombre)}${extra}</span><b>${signo}${fmt(p.monto)}</b></li>`;
+    const grupo = (titulo, items) => (items ? `<li class="leyenda-grupo">${titulo}</li>${items}` : '');
+    $('leyendaDistribucion').innerHTML =
+      grupo('Devengados · anillo externo', devengados.map((p) => fila(p, '+')).join('')) +
+      grupo('Deducciones', deducciones.map((p) => fila(p, '−')).join('')) +
+      grupo(`Bolsillos · neto ${fmt(t.neto)}`, bolsillos.map((p) => fila(p, '', pctNeto(p.monto))).join('') +
+        (libre >= 1 ? fila({ nombre: 'Sin asignar', color: '#9ca3af', monto: libre }, '', pctNeto(libre)) : ''));
   }
 
   function renderBarrasBolsillos() {
