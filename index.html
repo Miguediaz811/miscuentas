@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mis Cuentas · Salario y bolsillos</title>
+  <title>Mis Cuentas · Dashboard</title>
   <meta name="theme-color" content="#0f766e">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>💰 Mis Cuentas</h1>
+    <div class="marca">💰 <span>Mis Cuentas</span></div>
     <div class="mes-nav">
       <button id="mesPrev" class="btn-icon" aria-label="Mes anterior">‹</button>
       <input type="month" id="mesInput" aria-label="Mes">
@@ -17,95 +17,133 @@
     </div>
   </header>
 
-  <main class="container">
-    <!-- Salario y resumen -->
-    <section class="card">
-      <div class="nomina-head">
-        <h2>Nómina del mes</h2>
-        <span class="neto">Neto: <strong id="netoTotal">$0</strong></span>
-      </div>
-      <div id="nominaVacia" class="nomina-vacia" hidden>
-        <p>Este mes no tiene nómina registrada.</p>
-        <button id="btnCargarNomina" class="btn" type="button">Cargar nómina</button>
-      </div>
-      <div id="nominaDetalle">
-        <div id="conceptos"></div>
-        <button id="btnAddConcepto" class="btn btn-sec btn-peq" type="button">+ Concepto</button>
-        <div class="nomina-totales">
-          <span>Devengado: <strong id="totDevengado" class="pos">$0</strong></span>
-          <span>Deducciones: <strong id="totDeducciones" class="neg">$0</strong></span>
-        </div>
-      </div>
-      <div class="resumen">
-        <div><small>Asignado</small><strong id="resAsignado">$0</strong></div>
-        <div><small>Gastado</small><strong id="resGastado" class="neg">$0</strong></div>
-        <div><small>Disponible</small><strong id="resDisponible" class="pos">$0</strong></div>
-      </div>
-      <p id="avisoPct" class="aviso" hidden></p>
+  <main class="dash">
+    <!-- KPIs -->
+    <section class="kpis">
+      <div class="kpi"><small>Neto del mes</small><strong id="netoTotal">$0</strong><span class="kpi-sub">Devengado <b id="totDevengado">$0</b> · Deducciones <b id="totDeducciones">$0</b></span></div>
+      <div class="kpi"><small>Asignado a bolsillos</small><strong id="resAsignado">$0</strong><span class="kpi-sub" id="kpiPctAsignado">0% del neto</span></div>
+      <div class="kpi"><small>Gastado</small><strong id="resGastado" class="neg">$0</strong><span class="kpi-sub" id="kpiPctGastado">0% del presupuesto</span></div>
+      <div class="kpi"><small>Disponible para gastar</small><strong id="resDisponible" class="pos">$0</strong><span class="kpi-sub" id="kpiDiario">—</span></div>
+      <div class="kpi kpi-ahorro"><small>Ahorrado este mes</small><strong id="kpiAhorroMes">$0</strong><span class="kpi-sub" id="kpiAhorroSub">—</span></div>
     </section>
+    <p id="avisoPct" class="aviso" hidden></p>
 
-    <!-- Meta de ahorro -->
-    <section class="card meta">
-      <div class="meta-head">
-        <h2 id="metaTitulo">🏍️ Meta: Moto</h2>
-        <span id="metaPct">0%</span>
-      </div>
-      <div class="barra"><div id="metaBarra" class="barra-fill"></div></div>
-      <p class="meta-info"><span id="metaAhorrado">$0</span> de <span id="metaMonto">$0</span> · Faltan <strong id="metaFalta">$0</strong></p>
+    <!-- Fila 1: nómina · distribución · meta -->
+    <section class="fila fila-3">
+      <article class="card">
+        <div class="card-head"><h2>Nómina</h2><button id="btnAddConcepto" class="btn btn-sec btn-peq" type="button">+ Concepto</button></div>
+        <div id="nominaVacia" class="nomina-vacia" hidden>
+          <p>Este mes no tiene nómina registrada.</p>
+          <button id="btnCargarNomina" class="btn" type="button">Cargar nómina</button>
+        </div>
+        <div id="nominaDetalle"><div id="conceptos"></div><div id="nominaComp" class="nomina-comp"></div></div>
+      </article>
+
+      <article class="card">
+        <div class="card-head"><h2>Distribución del neto</h2></div>
+        <div class="donut-wrap">
+          <svg id="chartDistribucion" viewBox="0 0 200 200" role="img" aria-label="Distribución del neto por bolsillo"></svg>
+          <ul id="leyendaDistribucion" class="leyenda"></ul>
+        </div>
+      </article>
+
+      <article class="card meta">
+        <div class="card-head"><h2 id="metaTitulo">🎯 Meta</h2></div>
+        <div class="meta-wrap">
+          <svg id="chartMeta" viewBox="0 0 200 120" role="img" aria-label="Avance de la meta"></svg>
+          <div class="meta-datos">
+            <div><small>Ahorrado</small><strong id="metaAhorrado">$0</strong></div>
+            <div><small>Meta</small><strong id="metaMonto">$0</strong></div>
+            <div><small>Falta</small><strong id="metaFalta">$0</strong></div>
+            <div><small>Al ritmo actual</small><strong id="metaEta">—</strong></div>
+          </div>
+        </div>
+      </article>
     </section>
 
     <!-- Bolsillos -->
-    <section>
-      <h2 class="titulo">Bolsillos</h2>
-      <div id="bolsillos" class="grid"></div>
+    <section class="card">
+      <div class="card-head"><h2>Bolsillos</h2><span class="hint">Saldo = asignado + ingresos − gastos</span></div>
+      <div id="bolsillos" class="bolsillos"></div>
     </section>
 
-    <!-- Nuevo movimiento -->
-    <section class="card">
-      <h2>Registrar movimiento</h2>
-      <form id="formMov" class="form-mov">
-        <div class="tipo-toggle">
-          <label><input type="radio" name="tipo" value="gasto" checked> Gasto</label>
-          <label><input type="radio" name="tipo" value="ingreso"> Ingreso extra</label>
+    <!-- Fila 2: gráficos -->
+    <section class="fila fila-2">
+      <article class="card">
+        <div class="card-head"><h2>Asignado vs. gastado</h2></div>
+        <div id="chartBolsillos" class="hbars"></div>
+      </article>
+      <article class="card">
+        <div class="card-head">
+          <h2>Últimos 6 meses</h2>
+          <ul class="leyenda leyenda-inline">
+            <li><i style="background:#94a3b8"></i>Neto</li>
+            <li><i style="background:#ef4444"></i>Gastado</li>
+            <li><i style="background:#10b981"></i>Ahorrado</li>
+          </ul>
         </div>
-        <select id="movBolsillo" required aria-label="Bolsillo"></select>
-        <input type="number" id="movMonto" min="1" step="1" inputmode="numeric" placeholder="Monto" required>
-        <input type="text" id="movDesc" maxlength="80" placeholder="Descripción (ej: pasajes, almuerzo)">
-        <input type="date" id="movFecha" required aria-label="Fecha">
-        <button type="submit" class="btn">Agregar</button>
-      </form>
+        <svg id="chartHistorico" viewBox="0 0 600 230" role="img" aria-label="Histórico de los últimos 6 meses"></svg>
+      </article>
     </section>
 
-    <!-- Movimientos -->
-    <section class="card">
-      <div class="movs-head">
-        <h2>Movimientos del mes</h2>
-        <select id="filtroBolsillo" aria-label="Filtrar por bolsillo"></select>
-      </div>
-      <ul id="listaMovs" class="lista"></ul>
-      <p id="sinMovs" class="vacio">Aún no hay movimientos este mes.</p>
+    <!-- Fila 3: registrar · gasto diario · movimientos -->
+    <section class="fila fila-3b">
+      <article class="card">
+        <div class="card-head"><h2>Registrar movimiento</h2></div>
+        <form id="formMov" class="form-mov">
+          <div class="tipo-toggle">
+            <label><input type="radio" name="tipo" value="gasto" checked><span>Gasto</span></label>
+            <label><input type="radio" name="tipo" value="ingreso"><span>Ingreso extra</span></label>
+          </div>
+          <select id="movBolsillo" required aria-label="Bolsillo"></select>
+          <input type="number" id="movMonto" min="1" step="1" inputmode="numeric" placeholder="Monto" required>
+          <input type="text" id="movDesc" maxlength="80" placeholder="Descripción (ej: pasajes, almuerzo)">
+          <input type="date" id="movFecha" required aria-label="Fecha">
+          <button type="submit" class="btn">Agregar</button>
+        </form>
+      </article>
+
+      <article class="card">
+        <div class="card-head"><h2>Gasto por día</h2><span class="hint" id="promedioDiario"></span></div>
+        <svg id="chartDiario" viewBox="0 0 620 220" role="img" aria-label="Gasto por día del mes"></svg>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <h2>Movimientos</h2>
+          <select id="filtroBolsillo" class="select-peq" aria-label="Filtrar por bolsillo"></select>
+        </div>
+        <ul id="listaMovs" class="lista"></ul>
+        <p id="sinMovs" class="vacio">Aún no hay movimientos este mes.</p>
+      </article>
     </section>
 
     <!-- Configuración -->
     <details class="card config">
-      <summary>⚙️ Configurar bolsillos y meta</summary>
-      <p class="ayuda">Cada bolsillo recibe un porcentaje del salario. Marca 💾 los bolsillos de ahorro: su saldo suma a la meta.</p>
-      <div id="configBolsillos"></div>
-      <button id="btnAddBolsillo" class="btn btn-sec" type="button">+ Agregar bolsillo</button>
-      <p class="total-pct">Total asignado: <strong id="totalPct">0%</strong></p>
-      <div class="meta-config">
-        <label>Nombre de la meta <input type="text" id="cfgMetaNombre" maxlength="40"></label>
-        <label>Monto de la meta <input type="number" id="cfgMetaMonto" min="0" step="1000" inputmode="numeric"></label>
-      </div>
-      <button id="btnGuardarCfg" class="btn" type="button">Guardar configuración</button>
-
-      <hr>
-      <h3>Respaldo</h3>
-      <p class="ayuda">Los datos se guardan solo en este navegador. Exporta un respaldo de vez en cuando.</p>
-      <div class="acciones">
-        <button id="btnExport" class="btn btn-sec" type="button">⬇️ Exportar JSON</button>
-        <label class="btn btn-sec">⬆️ Importar JSON<input type="file" id="fileImport" accept="application/json" hidden></label>
-        <button id="btnReset" class="btn btn-peligro" type="button">🗑️ Borrar todo</button>
+      <summary>⚙️ Configurar bolsillos, meta y respaldo</summary>
+      <div class="config-grid">
+        <div>
+          <h3>Bolsillos</h3>
+          <p class="ayuda">Cada bolsillo recibe un porcentaje del neto. Marca 💾 los de ahorro: su saldo suma a la meta.</p>
+          <div id="configBolsillos"></div>
+          <button id="btnAddBolsillo" class="btn btn-sec btn-peq" type="button">+ Agregar bolsillo</button>
+          <p class="total-pct">Total asignado: <strong id="totalPct">0%</strong></p>
+        </div>
+        <div>
+          <h3>Meta de ahorro</h3>
+          <div class="meta-config">
+            <label>Nombre <input type="text" id="cfgMetaNombre" maxlength="40"></label>
+            <label>Monto <input type="number" id="cfgMetaMonto" min="0" step="1000" inputmode="numeric"></label>
+          </div>
+          <button id="btnGuardarCfg" class="btn" type="button">Guardar configuración</button>
+          <h3 class="mt">Respaldo</h3>
+          <p class="ayuda">Los datos se guardan solo en este navegador. Exporta un respaldo de vez en cuando.</p>
+          <div class="acciones">
+            <button id="btnExport" class="btn btn-sec btn-peq" type="button">⬇️ Exportar JSON</button>
+            <label class="btn btn-sec btn-peq">⬆️ Importar JSON<input type="file" id="fileImport" accept="application/json" hidden></label>
+            <button id="btnReset" class="btn btn-peligro btn-peq" type="button">🗑️ Borrar todo</button>
+          </div>
+        </div>
       </div>
     </details>
   </main>

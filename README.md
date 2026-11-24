@@ -5,6 +5,8 @@ HTML + CSS + JavaScript puro: sin dependencias, sin servidor, sin build.
 
 ## Funciones
 
+Dashboard horizontal con KPIs y gráficos SVG propios (sin librerías): distribución del neto (dona), avance de la meta (medidor), asignado vs. gastado, histórico de 6 meses y gasto diario por bolsillo.
+
 - Nómina por conceptos (devengados y deducciones) con neto calculado; cada mes nuevo se carga con un clic desde la última nómina.
 - Navegación entre meses.
 - Bolsillos por porcentaje del neto (por defecto: Transporte 15 %, Alimentación 30 %, Gastos varios 15 %, Ahorro moto 40 %).

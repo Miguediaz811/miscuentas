@@ -97,15 +97,6 @@
   const bolsilloPorId = (id) => state.bolsillos.find((b) => b.id === id);
 
   // ---------- Render ----------
-  function render() {
-    renderMes();
-    renderResumen();
-    renderMeta();
-    renderBolsillos();
-    renderSelects();
-    renderMovimientos();
-  }
-
   function renderMes() {
     $('mesInput').value = mesActual;
     const mes = leerMes(mesActual);
@@ -127,6 +118,18 @@
         <button type="button" class="btn-borrar" data-quitar-c="${i}" aria-label="Quitar concepto">✕</button>
       </div>`).join('');
     const t = totalesNomina(mes);
+    const comp = (mes.conceptos || []).filter((c) => c.monto > 0);
+    const totalComp = comp.reduce((s2, c) => s2 + c.monto, 0) || 1;
+    const tonos = { devengado: ['#0f766e', '#14b8a6', '#5eead4', '#99f6e4'], deduccion: ['#dc2626', '#f87171', '#fca5a5', '#fecaca'] };
+    const idx = { devengado: 0, deduccion: 0 };
+    const segs = comp.map((c) => {
+      const k = c.tipo === 'deduccion' ? 'deduccion' : 'devengado';
+      const col = tonos[k][idx[k]++ % 4];
+      return { c, col, w: (c.monto / totalComp) * 100 };
+    });
+    $('nominaComp').innerHTML = comp.length ? `
+      <div class="comp-barra">${segs.map((s2) => `<span style="width:${s2.w}%;background:${s2.col}" title="${escapar(s2.c.nombre)}: ${fmt(s2.c.monto)}"></span>`).join('')}</div>
+      <ul class="comp-leyenda">${segs.map((s2) => `<li><i style="background:${s2.col}"></i>${escapar(s2.c.nombre || 'Concepto')} <b>${s2.c.tipo === 'deduccion' ? '−' : '+'}${fmt(s2.c.monto)}</b></li>`).join('')}</ul>` : '';
     $('totDevengado').textContent = fmt(t.devengado);
     $('totDeducciones').textContent = fmt(t.deducciones);
     $('netoTotal').textContent = fmt(t.neto);
@@ -139,29 +142,72 @@
     guardar();
   }
 
-  function renderResumen() {
-    const mes = leerMes(mesActual);
-    let asignado = 0, gastado = 0, saldo = 0;
+  function render() {
+    renderMes();
+    renderResumen();
+    renderMeta();
+    renderBolsillos();
+    renderDistribucion();
+    renderBarrasBolsillos();
+    renderHistorico();
+    renderDiario();
+    renderSelects();
+    renderMovimientos();
+  }
+
+  // ---------- Helpers de gráficos ----------
+  const fmtCorto = (n) => {
+    const a = Math.abs(n);
+    if (a >= 1e6) return `${(n / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace('.0', '')}M`;
+    if (a >= 1e3) return `${Math.round(n / 1e3)}k`;
+    return String(Math.round(n));
+  };
+  const escalaMax = (v) => {
+    if (v <= 0) return 1;
+    const p = 10 ** Math.floor(Math.log10(v));
+    return [1, 2, 2.5, 5, 10].map((m) => m * p).find((x) => x >= v);
+  };
+  const diasDelMes = (m) => { const [y, mm] = m.split('-').map(Number); return new Date(y, mm, 0).getDate(); };
+  const nombreMesCorto = (m) => NOMBRES_MES[Number(m.split('-')[1]) - 1].slice(0, 3);
+  const sumarMes = (m, d) => { const [y, mm] = m.split('-').map(Number); return mesDe(new Date(y, mm - 1 + d, 1)); };
+
+  function resumenMes(mes) {
+    let asignado = 0, gastado = 0, disponible = 0, presupuesto = 0, ahorro = 0;
     for (const b of state.bolsillos) {
       const c = calcBolsillo(mes, b);
       asignado += c.asignado;
-      if (!b.ahorro) { gastado += c.gastos; saldo += c.saldo; }
+      if (b.ahorro) ahorro += c.saldo;
+      else { gastado += c.gastos; disponible += c.saldo; presupuesto += c.asignado + c.ingresos; }
     }
-    $('resAsignado').textContent = fmt(asignado);
-    $('resGastado').textContent = fmt(gastado);
-    $('resDisponible').textContent = fmt(saldo);
-    $('resDisponible').className = saldo < 0 ? 'neg' : 'pos';
+    return { asignado, gastado, disponible, presupuesto, ahorro };
+  }
+
+  function renderResumen() {
+    const mes = leerMes(mesActual);
+    const neto = netoMes(mes);
+    const r = resumenMes(mes);
+    $('resAsignado').textContent = fmt(r.asignado);
+    $('kpiPctAsignado').textContent = `${neto ? Math.round((r.asignado / neto) * 100) : 0}% del neto`;
+    $('resGastado').textContent = fmt(r.gastado);
+    $('kpiPctGastado').textContent = `${r.presupuesto ? Math.round((r.gastado / r.presupuesto) * 100) : 0}% del presupuesto de gastos`;
+    $('resDisponible').textContent = fmt(r.disponible);
+    $('resDisponible').className = r.disponible < 0 ? 'neg' : 'pos';
+
+    const hoy = new Date();
+    if (mesActual === mesDe(hoy) && r.disponible > 0) {
+      const restantes = diasDelMes(mesActual) - hoy.getDate() + 1;
+      $('kpiDiario').textContent = `≈ ${fmt(r.disponible / restantes)} por día (${restantes} días)`;
+    } else {
+      $('kpiDiario').textContent = r.disponible < 0 ? 'Te pasaste del presupuesto' : 'Saldo de gastos del mes';
+    }
+    $('kpiAhorroMes').textContent = fmt(r.ahorro);
+    $('kpiAhorroSub').textContent = neto ? `${Math.round((r.ahorro / neto) * 100)}% del neto` : '—';
 
     const pct = totalPct();
     const aviso = $('avisoPct');
-    if (pct !== 100) {
-      aviso.hidden = false;
-      aviso.textContent = pct < 100
-        ? `Tienes ${100 - pct}% del salario sin asignar a ningún bolsillo (${fmt(netoMes(mes) * (100 - pct) / 100)}).`
-        : `Los bolsillos suman ${pct}%: estás asignando más de lo que ganas.`;
-    } else {
-      aviso.hidden = true;
-    }
+    aviso.hidden = pct === 100;
+    if (pct < 100) aviso.textContent = `Tienes ${100 - pct}% del neto sin asignar a ningún bolsillo (${fmt(neto * (100 - pct) / 100)}).`;
+    else if (pct > 100) aviso.textContent = `Los bolsillos suman ${pct}%: estás asignando más de lo que ganas.`;
   }
 
   function renderMeta() {
@@ -169,11 +215,33 @@
     const ahorrado = totalAhorrado();
     const pct = monto > 0 ? Math.min(100, Math.max(0, (ahorrado / monto) * 100)) : 0;
     $('metaTitulo').textContent = `🎯 Meta: ${nombre || 'Ahorro'}`;
-    $('metaPct').textContent = `${pct.toFixed(0)}%`;
-    $('metaBarra').style.width = `${pct}%`;
     $('metaAhorrado').textContent = fmt(ahorrado);
     $('metaMonto').textContent = fmt(monto);
-    $('metaFalta').textContent = ahorrado >= monto ? '¡Nada, meta cumplida! 🎉' : fmt(monto - ahorrado);
+    $('metaFalta').textContent = ahorrado >= monto ? '¡Cumplida! 🎉' : fmt(monto - ahorrado);
+
+    // Ritmo: promedio de ahorro de los meses con nómina
+    const meses = Object.values(state.meses).filter((m) => netoMes(m) > 0);
+    const prom = meses.length ? meses.reduce((s, m) => s + resumenMes(m).ahorro, 0) / meses.length : 0;
+    $('metaEta').textContent = ahorrado >= monto ? '—'
+      : prom > 0 ? `${Math.ceil((monto - ahorrado) / prom)} mes(es) más` : 'Sin datos';
+
+    const arco = 'M 20 105 A 80 80 0 0 1 180 105';
+    $('chartMeta').innerHTML = `
+      <defs><linearGradient id="gMeta" x1="0" x2="1"><stop offset="0" stop-color="#14b8a6"/><stop offset="1" stop-color="#10b981"/></linearGradient></defs>
+      <path d="${arco}" fill="none" stroke="#e2e8f0" stroke-width="18" stroke-linecap="round"/>
+      <path d="${arco}" fill="none" stroke="url(#gMeta)" stroke-width="18" stroke-linecap="round"
+        pathLength="100" stroke-dasharray="${pct} 100" style="transition:stroke-dasharray .6s"/>
+      <text x="100" y="92" text-anchor="middle" font-size="30" font-weight="800" fill="#0f172a">${pct.toFixed(0)}%</text>
+      <text x="100" y="112" text-anchor="middle" class="eje">completado</text>`;
+  }
+
+  function anillo(pct, color) {
+    return `<svg class="anillo" viewBox="0 0 36 36">
+      <circle cx="18" cy="18" r="15" fill="none" stroke="#fff" stroke-width="5"/>
+      <circle cx="18" cy="18" r="15" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"
+        pathLength="100" stroke-dasharray="${Math.max(0, Math.min(100, pct))} 100" transform="rotate(-90 18 18)"/>
+      <text x="18" y="21" text-anchor="middle" font-size="8.5" font-weight="700" fill="#0f172a">${Math.round(pct)}%</text>
+    </svg>`;
   }
 
   function renderBolsillos() {
@@ -181,19 +249,146 @@
     $('bolsillos').innerHTML = state.bolsillos.map((b) => {
       const c = calcBolsillo(mes, b);
       const base = c.asignado + c.ingresos;
-      const usado = base > 0 ? Math.min(100, (c.gastos / base) * 100) : 0;
+      // Gasto: % usado. Ahorro: % que se conserva.
+      const pct = base > 0 ? (b.ahorro ? (c.saldo / base) * 100 : (c.gastos / base) * 100) : 0;
       return `
         <article class="bolsillo ${c.saldo < 0 ? 'sobregirado' : ''}" style="--color:${escapar(b.color)}">
-          <h3>${b.ahorro ? '💾 ' : ''}${escapar(b.nombre)} <small>${b.porcentaje}%</small></h3>
-          <div class="saldo">${fmt(c.saldo)}</div>
-          <div class="barra"><div class="barra-fill" style="width:${usado}%"></div></div>
-          <div class="detalle">
-            <span>Asignado: ${fmt(c.asignado)}</span>
-            ${c.ingresos ? `<span>Ingresos extra: ${fmt(c.ingresos)}</span>` : ''}
-            <span>${b.ahorro ? 'Retirado' : 'Gastado'}: ${fmt(c.gastos)}</span>
+          <div class="bolsillo-top"><h3>${b.ahorro ? '💾 ' : ''}${escapar(b.nombre)}</h3><span class="chip">${b.porcentaje}%</span></div>
+          <div class="bolsillo-cuerpo">
+            ${anillo(pct, escapar(b.color))}
+            <div>
+              <div class="saldo">${fmt(c.saldo)}</div>
+              <div class="detalle">de ${fmt(base)} · ${b.ahorro ? 'retirado' : 'gastado'} ${fmt(c.gastos)}</div>
+            </div>
           </div>
         </article>`;
     }).join('');
+  }
+
+  function renderDistribucion() {
+    const neto = netoMes(leerMes(mesActual));
+    const libre = Math.max(0, 100 - totalPct());
+    const partes = state.bolsillos.map((b) => ({ nombre: b.nombre, color: b.color, pct: Number(b.porcentaje) || 0 }));
+    if (libre > 0) partes.push({ nombre: 'Sin asignar', color: '#cbd5e1', pct: libre });
+    const total = partes.reduce((s, p) => s + p.pct, 0) || 1;
+    let off = 0;
+    const arcos = partes.map((p) => {
+      const len = (p.pct / total) * 100;
+      const seg = `<circle cx="100" cy="100" r="72" fill="none" stroke="${escapar(p.color)}" stroke-width="28"
+        pathLength="100" stroke-dasharray="${Math.max(0, len - 0.8)} ${100 - Math.max(0, len - 0.8)}" stroke-dashoffset="${-off}"
+        transform="rotate(-90 100 100)"><title>${escapar(p.nombre)}: ${p.pct}%</title></circle>`;
+      off += len;
+      return seg;
+    }).join('');
+    $('chartDistribucion').innerHTML = `${arcos}
+      <text x="100" y="98" text-anchor="middle" font-size="24" font-weight="800" fill="#0f172a">${fmtCorto(neto)}</text>
+      <text x="100" y="118" text-anchor="middle" class="eje">neto</text>`;
+    $('leyendaDistribucion').innerHTML = partes.map((p) => `
+      <li><i style="background:${escapar(p.color)}"></i><span>${escapar(p.nombre)}</span><b>${p.pct}%</b>
+      <small>${fmt(neto * p.pct / 100)}</small></li>`).join('');
+  }
+
+  function renderBarrasBolsillos() {
+    const mes = leerMes(mesActual);
+    $('chartBolsillos').innerHTML = state.bolsillos.map((b) => {
+      const c = calcBolsillo(mes, b);
+      const base = c.asignado + c.ingresos;
+      const pct = base > 0 ? (c.gastos / base) * 100 : 0;
+      const color = escapar(b.color);
+      return `
+        <div class="hbar-fila" title="${escapar(b.nombre)}: ${fmt(c.gastos)} de ${fmt(base)}">
+          <span class="hbar-nombre">${escapar(b.nombre)}</span>
+          <div class="hbar-track" style="background:color-mix(in srgb, ${color} 15%, #fff)">
+            <div class="hbar-fill" style="width:${Math.min(100, pct)}%;background:${pct > 100 ? '#dc2626' : color}"></div>
+            <span class="hbar-txt">${fmt(c.gastos)} / ${fmt(base)}</span>
+          </div>
+          <span class="hbar-pct ${pct > 100 ? 'neg' : ''}">${Math.round(pct)}%</span>
+        </div>`;
+    }).join('');
+  }
+
+  function renderHistorico() {
+    const W = 600, H = 230, L = 48, R = 8, T = 10, B = 28;
+    const meses = Array.from({ length: 6 }, (_, i) => sumarMes(mesActual, i - 5));
+    const datos = meses.map((m) => {
+      const mes = leerMes(m);
+      const r = resumenMes(mes);
+      return { m, neto: netoMes(mes), gastado: r.gastado, ahorro: Math.max(0, r.ahorro) };
+    });
+    const max = escalaMax(Math.max(...datos.flatMap((d) => [d.neto, d.gastado, d.ahorro]), 1));
+    const ph = H - T - B, gw = (W - L - R) / datos.length, bw = Math.min(22, gw / 4.2);
+    const y = (v) => T + ph - (v / max) * ph;
+    let svg = '';
+    for (let i = 0; i <= 4; i++) {
+      const v = (max / 4) * i, yy = y(v);
+      svg += `<line class="grid-line" x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}"/>
+        <text class="eje" x="${L - 6}" y="${yy + 4}" text-anchor="end">${fmtCorto(v)}</text>`;
+    }
+    const series = [['neto', '#94a3b8'], ['gastado', '#ef4444'], ['ahorro', '#10b981']];
+    datos.forEach((d, i) => {
+      const cx = L + gw * i + gw / 2;
+      series.forEach(([k, color], j) => {
+        const x = cx - (3 * bw + 6) / 2 + j * (bw + 3);
+        const h = (d[k] / max) * ph;
+        svg += `<rect x="${x}" y="${y(d[k])}" width="${bw}" height="${h}" rx="4" fill="${color}"
+          opacity="${d.m === mesActual ? 1 : 0.75}"><title>${nombreMesCorto(d.m)} · ${k}: ${fmt(d[k])}</title></rect>`;
+      });
+      svg += `<text class="eje" x="${cx}" y="${H - 8}" text-anchor="middle"
+        ${d.m === mesActual ? 'font-weight="700" fill="#0f172a"' : ''}>${nombreMesCorto(d.m)} ${d.m.slice(2, 4)}</text>`;
+    });
+    $('chartHistorico').innerHTML = svg;
+  }
+
+  function renderDiario() {
+    const W = 620, H = 220, L = 44, R = 8, T = 10, B = 26;
+    const n = diasDelMes(mesActual);
+    const dias = Array.from({ length: n }, () => ({}));
+    let total = 0;
+    for (const m of leerMes(mesActual).movimientos) {
+      if (m.tipo !== 'gasto') continue;
+      const d = Number(m.fecha.slice(8, 10)) - 1;
+      if (!dias[d]) continue;
+      dias[d][m.bolsilloId] = (dias[d][m.bolsilloId] || 0) + m.monto;
+      total += m.monto;
+    }
+    const sumas = dias.map((d) => Object.values(d).reduce((s, v) => s + v, 0));
+    const hoy = new Date();
+    const diasTranscurridos = mesActual === mesDe(hoy) ? hoy.getDate() : (mesActual < mesDe(hoy) ? n : 0);
+    const prom = diasTranscurridos ? total / diasTranscurridos : 0;
+    $('promedioDiario').textContent = prom ? `Promedio: ${fmt(prom)}/día` : '';
+
+    const max = escalaMax(Math.max(...sumas, prom, 1));
+    const ph = H - T - B, cw = (W - L - R) / n, bw = Math.max(3, cw * 0.62);
+    const y = (v) => T + ph - (v / max) * ph;
+    let svg = '';
+    for (let i = 0; i <= 4; i++) {
+      const v = (max / 4) * i, yy = y(v);
+      svg += `<line class="grid-line" x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}"/>
+        <text class="eje" x="${L - 6}" y="${yy + 4}" text-anchor="end">${fmtCorto(v)}</text>`;
+    }
+    dias.forEach((d, i) => {
+      const x = L + cw * i + (cw - bw) / 2;
+      let base = 0;
+      for (const b of state.bolsillos) {
+        const v = d[b.id];
+        if (!v) continue;
+        const h = (v / max) * ph;
+        svg += `<rect x="${x}" y="${y(base + v)}" width="${bw}" height="${h}" fill="${escapar(b.color)}">
+          <title>Día ${i + 1} · ${escapar(b.nombre)}: ${fmt(v)}</title></rect>`;
+        base += v;
+      }
+      const otros = sumas[i] - base; // bolsillos eliminados
+      if (otros > 0) svg += `<rect x="${x}" y="${y(base + otros)}" width="${bw}" height="${(otros / max) * ph}" fill="#94a3b8"/>`;
+      if (i === 0 || (i + 1) % 5 === 0) {
+        svg += `<text class="eje" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${i + 1}</text>`;
+      }
+    });
+    if (prom) {
+      svg += `<line x1="${L}" x2="${W - R}" y1="${y(prom)}" y2="${y(prom)}" stroke="#0f172a" stroke-dasharray="4 4" opacity=".5"/>
+        <text x="${W - R}" y="${y(prom) - 5}" text-anchor="end" font-size="11" fill="#0f172a" opacity=".7">prom. ${fmtCorto(prom)}</text>`;
+    }
+    if (!total) svg += `<text x="${(W + L) / 2}" y="${H / 2}" text-anchor="middle" class="eje" font-size="13">Sin gastos registrados este mes</text>`;
+    $('chartDiario').innerHTML = svg;
   }
 
   function renderSelects() {
