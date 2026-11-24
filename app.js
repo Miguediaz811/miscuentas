@@ -30,14 +30,15 @@
 
   const porDefecto = () => ({
     bolsillos: [
-      { id: 'transporte', nombre: 'Transporte', porcentaje: 15, color: '#3b82f6', ahorro: false },
-      { id: 'alimentacion', nombre: 'Alimentación', porcentaje: 30, color: '#f59e0b', ahorro: false },
-      { id: 'varios', nombre: 'Gastos varios', porcentaje: 15, color: '#8b5cf6', ahorro: false },
-      { id: 'moto', nombre: 'Ahorro moto', porcentaje: 40, color: '#10b981', ahorro: true },
+      { id: 'transporte', nombre: 'Transporte', porcentaje: 15, color: '#0ea5e9', ahorro: false },
+      { id: 'alimentacion', nombre: 'Alimentación', porcentaje: 30, color: '#f97316', ahorro: false },
+      { id: 'varios', nombre: 'Gastos varios', porcentaje: 15, color: '#64748b', ahorro: false },
+      { id: 'moto', nombre: 'Ahorro moto', porcentaje: 40, color: '#2563eb', ahorro: true },
     ],
     meta: { nombre: 'Moto', monto: 3000000 },
     nominaBase: NOMINA_INICIAL.map((c) => ({ ...c })),
     meses: {},
+    paletaV3: true,
   });
 
   // ---------- Persistencia ----------
@@ -46,6 +47,13 @@
       const s = JSON.parse(localStorage.getItem(KEY));
       if (s && Array.isArray(s.bolsillos) && s.meses) {
         if (!Array.isArray(s.nominaBase)) s.nominaBase = NOMINA_INICIAL.map((c) => ({ ...c }));
+        // Migra los colores de las paletas anteriores (verde y violeta) a la azul/naranja
+        const viejos = ['#3b82f6', '#38bdf8', '#f59e0b', '#8b5cf6', '#f472b6', '#10b981'];
+        if (!s.paletaV3) {
+          const nuevos = Object.fromEntries(porDefecto().bolsillos.map((b) => [b.id, b.color]));
+          s.bolsillos.forEach((b) => { if (nuevos[b.id] && viejos.includes(b.color)) b.color = nuevos[b.id]; });
+          s.paletaV3 = true;
+        }
         return s;
       }
     } catch (e) { /* datos corruptos o storage no disponible */ }
@@ -120,7 +128,7 @@
     const t = totalesNomina(mes);
     const comp = (mes.conceptos || []).filter((c) => c.monto > 0);
     const totalComp = comp.reduce((s2, c) => s2 + c.monto, 0) || 1;
-    const tonos = { devengado: ['#0f766e', '#14b8a6', '#5eead4', '#99f6e4'], deduccion: ['#dc2626', '#f87171', '#fca5a5', '#fecaca'] };
+    const tonos = { devengado: ['#2563eb', '#0ea5e9', '#60a5fa', '#bae6fd'], deduccion: ['#f97316', '#fb923c', '#fdba74', '#fed7aa'] };
     const idx = { devengado: 0, deduccion: 0 };
     const segs = comp.map((c) => {
       const k = c.tipo === 'deduccion' ? 'deduccion' : 'devengado';
@@ -189,6 +197,8 @@
     $('resAsignado').textContent = fmt(r.asignado);
     $('kpiPctAsignado').textContent = `${neto ? Math.round((r.asignado / neto) * 100) : 0}% del neto`;
     $('resGastado').textContent = fmt(r.gastado);
+    const pctG = r.presupuesto ? (r.gastado / r.presupuesto) * 100 : 0;
+    $('resGastado').style.color = estadoGasto(pctG).color;
     $('kpiPctGastado').textContent = `${r.presupuesto ? Math.round((r.gastado / r.presupuesto) * 100) : 0}% del presupuesto de gastos`;
     $('resDisponible').textContent = fmt(r.disponible);
     $('resDisponible').className = r.disponible < 0 ? 'neg' : 'pos';
@@ -227,20 +237,27 @@
 
     const arco = 'M 20 105 A 80 80 0 0 1 180 105';
     $('chartMeta').innerHTML = `
-      <defs><linearGradient id="gMeta" x1="0" x2="1"><stop offset="0" stop-color="#14b8a6"/><stop offset="1" stop-color="#10b981"/></linearGradient></defs>
-      <path d="${arco}" fill="none" stroke="#e2e8f0" stroke-width="18" stroke-linecap="round"/>
+      <defs><linearGradient id="gMeta" x1="0" x2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#f97316"/></linearGradient></defs>
+      <path d="${arco}" fill="none" class="svg-track" stroke-width="18" stroke-linecap="round"/>
       <path d="${arco}" fill="none" stroke="url(#gMeta)" stroke-width="18" stroke-linecap="round"
         pathLength="100" stroke-dasharray="${pct} 100" style="transition:stroke-dasharray .6s"/>
-      <text x="100" y="92" text-anchor="middle" font-size="30" font-weight="800" fill="#0f172a">${pct.toFixed(0)}%</text>
+      <text x="100" y="92" text-anchor="middle" font-size="30" font-weight="800" class="svg-txt">${pct.toFixed(0)}%</text>
       <text x="100" y="112" text-anchor="middle" class="eje">completado</text>`;
+  }
+
+  // Semáforo: verde < 50 %, amarillo < 80 %, rojo ≥ 80 % del bolsillo gastado
+  function estadoGasto(pct) {
+    if (pct >= 80) return { clase: 'alto', color: 'var(--alto)', txt: pct > 100 ? 'Sobregirado' : 'Gasto alto' };
+    if (pct >= 50) return { clase: 'cuidado', color: 'var(--cuidado)', txt: 'Cuidado' };
+    return { clase: 'ok', color: 'var(--ok)', txt: 'Vas bien' };
   }
 
   function anillo(pct, color) {
     return `<svg class="anillo" viewBox="0 0 36 36">
-      <circle cx="18" cy="18" r="15" fill="none" stroke="#fff" stroke-width="5"/>
-      <circle cx="18" cy="18" r="15" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"
+      <circle cx="18" cy="18" r="15" fill="none" class="svg-track" stroke-width="5"/>
+      <circle cx="18" cy="18" r="15" fill="none" style="stroke:${color}" stroke-width="5" stroke-linecap="round"
         pathLength="100" stroke-dasharray="${Math.max(0, Math.min(100, pct))} 100" transform="rotate(-90 18 18)"/>
-      <text x="18" y="21" text-anchor="middle" font-size="8.5" font-weight="700" fill="#0f172a">${Math.round(pct)}%</text>
+      <text x="18" y="21" text-anchor="middle" font-size="8.5" font-weight="700" class="svg-txt">${Math.round(pct)}%</text>
     </svg>`;
   }
 
@@ -251,14 +268,17 @@
       const base = c.asignado + c.ingresos;
       // Gasto: % usado. Ahorro: % que se conserva.
       const pct = base > 0 ? (b.ahorro ? (c.saldo / base) * 100 : (c.gastos / base) * 100) : 0;
+      const est = b.ahorro ? null : estadoGasto(pct);
+      const colorAnillo = b.ahorro ? escapar(b.color) : est.color;
       return `
         <article class="bolsillo ${c.saldo < 0 ? 'sobregirado' : ''}" style="--color:${escapar(b.color)}">
           <div class="bolsillo-top"><h3>${b.ahorro ? '💾 ' : ''}${escapar(b.nombre)}</h3><span class="chip">${b.porcentaje}%</span></div>
           <div class="bolsillo-cuerpo">
-            ${anillo(pct, escapar(b.color))}
+            ${anillo(pct, colorAnillo)}
             <div>
               <div class="saldo">${fmt(c.saldo)}</div>
               <div class="detalle">de ${fmt(base)} · ${b.ahorro ? 'retirado' : 'gastado'} ${fmt(c.gastos)}</div>
+              ${est ? `<span class="estado estado-${est.clase}">${est.txt}</span>` : '<span class="estado" style="color:' + escapar(b.color) + '">Ahorro</span>'}
             </div>
           </div>
         </article>`;
@@ -269,7 +289,7 @@
     const neto = netoMes(leerMes(mesActual));
     const libre = Math.max(0, 100 - totalPct());
     const partes = state.bolsillos.map((b) => ({ nombre: b.nombre, color: b.color, pct: Number(b.porcentaje) || 0 }));
-    if (libre > 0) partes.push({ nombre: 'Sin asignar', color: '#cbd5e1', pct: libre });
+    if (libre > 0) partes.push({ nombre: 'Sin asignar', color: '#9ca3af', pct: libre });
     const total = partes.reduce((s, p) => s + p.pct, 0) || 1;
     let off = 0;
     const arcos = partes.map((p) => {
@@ -281,7 +301,7 @@
       return seg;
     }).join('');
     $('chartDistribucion').innerHTML = `${arcos}
-      <text x="100" y="98" text-anchor="middle" font-size="24" font-weight="800" fill="#0f172a">${fmtCorto(neto)}</text>
+      <text x="100" y="98" text-anchor="middle" font-size="24" font-weight="800" class="svg-txt">${fmtCorto(neto)}</text>
       <text x="100" y="118" text-anchor="middle" class="eje">neto</text>`;
     $('leyendaDistribucion').innerHTML = partes.map((p) => `
       <li><i style="background:${escapar(p.color)}"></i><span>${escapar(p.nombre)}</span><b>${p.pct}%</b>
@@ -298,11 +318,11 @@
       return `
         <div class="hbar-fila" title="${escapar(b.nombre)}: ${fmt(c.gastos)} de ${fmt(base)}">
           <span class="hbar-nombre">${escapar(b.nombre)}</span>
-          <div class="hbar-track" style="background:color-mix(in srgb, ${color} 15%, #fff)">
-            <div class="hbar-fill" style="width:${Math.min(100, pct)}%;background:${pct > 100 ? '#dc2626' : color}"></div>
+          <div class="hbar-track" style="background:var(--track)">
+            <div class="hbar-fill" style="width:${Math.min(100, pct)}%;background:${b.ahorro ? color : estadoGasto(pct).color}"></div>
             <span class="hbar-txt">${fmt(c.gastos)} / ${fmt(base)}</span>
           </div>
-          <span class="hbar-pct ${pct > 100 ? 'neg' : ''}">${Math.round(pct)}%</span>
+          <span class="hbar-pct" style="color:${b.ahorro ? 'inherit' : estadoGasto(pct).color}">${Math.round(pct)}%</span>
         </div>`;
     }).join('');
   }
@@ -324,7 +344,7 @@
       svg += `<line class="grid-line" x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}"/>
         <text class="eje" x="${L - 6}" y="${yy + 4}" text-anchor="end">${fmtCorto(v)}</text>`;
     }
-    const series = [['neto', '#94a3b8'], ['gastado', '#ef4444'], ['ahorro', '#10b981']];
+    const series = [['neto', '#94a3b8'], ['gastado', '#ef4444'], ['ahorro', '#2563eb']];
     datos.forEach((d, i) => {
       const cx = L + gw * i + gw / 2;
       series.forEach(([k, color], j) => {
@@ -334,7 +354,7 @@
           opacity="${d.m === mesActual ? 1 : 0.75}"><title>${nombreMesCorto(d.m)} · ${k}: ${fmt(d[k])}</title></rect>`;
       });
       svg += `<text class="eje" x="${cx}" y="${H - 8}" text-anchor="middle"
-        ${d.m === mesActual ? 'font-weight="700" fill="#0f172a"' : ''}>${nombreMesCorto(d.m)} ${d.m.slice(2, 4)}</text>`;
+        ${d.m === mesActual ? 'font-weight="700" style="fill:var(--texto)"' : ''}>${nombreMesCorto(d.m)} ${d.m.slice(2, 4)}</text>`;
     });
     $('chartHistorico').innerHTML = svg;
   }
@@ -384,8 +404,8 @@
       }
     });
     if (prom) {
-      svg += `<line x1="${L}" x2="${W - R}" y1="${y(prom)}" y2="${y(prom)}" stroke="#0f172a" stroke-dasharray="4 4" opacity=".5"/>
-        <text x="${W - R}" y="${y(prom) - 5}" text-anchor="end" font-size="11" fill="#0f172a" opacity=".7">prom. ${fmtCorto(prom)}</text>`;
+      svg += `<line x1="${L}" x2="${W - R}" y1="${y(prom)}" y2="${y(prom)}" style="stroke:var(--texto)" stroke-dasharray="4 4" opacity=".5"/>
+        <text x="${W - R}" y="${y(prom) - 5}" text-anchor="end" font-size="11" class="svg-txt" opacity=".7">prom. ${fmtCorto(prom)}</text>`;
     }
     if (!total) svg += `<text x="${(W + L) / 2}" y="${H / 2}" text-anchor="middle" class="eje" font-size="13">Sin gastos registrados este mes</text>`;
     $('chartDiario').innerHTML = svg;
@@ -639,6 +659,22 @@
     render();
     toast('Datos borrados');
   });
+
+  // ---------- Tema claro / oscuro ----------
+  const TEMA_KEY = 'mis-cuentas-tema';
+  function aplicarTema(t) {
+    document.documentElement.dataset.theme = t;
+    $('btnTema').textContent = t === 'dark' ? '☀️ Claro' : '🌙 Oscuro';
+    document.querySelector('meta[name="theme-color"]').content = t === 'dark' ? '#0b1a3a' : '#1e40af';
+  }
+  $('btnTema').addEventListener('click', () => {
+    const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(TEMA_KEY, t); } catch (e) { /* sin storage */ }
+    aplicarTema(t);
+  });
+  let temaGuardado = null;
+  try { temaGuardado = localStorage.getItem(TEMA_KEY); } catch (e) { /* sin storage */ }
+  aplicarTema(temaGuardado || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 
   // ---------- Inicio ----------
   ajustarFechaForm();

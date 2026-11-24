@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mis Cuentas · Dashboard</title>
-  <meta name="theme-color" content="#0f766e">
+  <meta name="theme-color" content="#1e40af">
   <link rel="stylesheet" href="styles.css">
+  <script>try{var t=localStorage.getItem("mis-cuentas-tema");document.documentElement.dataset.theme=t||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){}</script>
 </head>
 <body>
   <header class="topbar">
@@ -14,6 +15,7 @@
       <button id="mesPrev" class="btn-icon" aria-label="Mes anterior">‹</button>
       <input type="month" id="mesInput" aria-label="Mes">
       <button id="mesNext" class="btn-icon" aria-label="Mes siguiente">›</button>
+      <button id="btnTema" class="btn-tema" type="button" aria-label="Cambiar tema">🌙 Oscuro</button>
     </div>
   </header>
 
@@ -22,7 +24,7 @@
     <section class="kpis">
       <div class="kpi"><small>Neto del mes</small><strong id="netoTotal">$0</strong><span class="kpi-sub">Devengado <b id="totDevengado">$0</b> · Deducciones <b id="totDeducciones">$0</b></span></div>
       <div class="kpi"><small>Asignado a bolsillos</small><strong id="resAsignado">$0</strong><span class="kpi-sub" id="kpiPctAsignado">0% del neto</span></div>
-      <div class="kpi"><small>Gastado</small><strong id="resGastado" class="neg">$0</strong><span class="kpi-sub" id="kpiPctGastado">0% del presupuesto</span></div>
+      <div class="kpi"><small>Gastado</small><strong id="resGastado">$0</strong><span class="kpi-sub" id="kpiPctGastado">0% del presupuesto</span></div>
       <div class="kpi"><small>Disponible para gastar</small><strong id="resDisponible" class="pos">$0</strong><span class="kpi-sub" id="kpiDiario">—</span></div>
       <div class="kpi kpi-ahorro"><small>Ahorrado este mes</small><strong id="kpiAhorroMes">$0</strong><span class="kpi-sub" id="kpiAhorroSub">—</span></div>
     </section>
@@ -70,7 +72,7 @@
     <!-- Fila 2: gráficos -->
     <section class="fila fila-2">
       <article class="card">
-        <div class="card-head"><h2>Asignado vs. gastado</h2></div>
+        <div class="card-head"><h2>Asignado vs. gastado</h2><span class="leyenda-semaforo"><span><i style="background:var(--ok)"></i>&lt;50%</span><span><i style="background:var(--cuidado)"></i>50–80%</span><span><i style="background:var(--alto)"></i>&gt;80%</span></span></div>
         <div id="chartBolsillos" class="hbars"></div>
       </article>
       <article class="card">
@@ -79,7 +81,7 @@
           <ul class="leyenda leyenda-inline">
             <li><i style="background:#94a3b8"></i>Neto</li>
             <li><i style="background:#ef4444"></i>Gastado</li>
-            <li><i style="background:#10b981"></i>Ahorrado</li>
+            <li><i style="background:#2563eb"></i>Ahorrado</li>
           </ul>
         </div>
         <svg id="chartHistorico" viewBox="0 0 600 230" role="img" aria-label="Histórico de los últimos 6 meses"></svg>
