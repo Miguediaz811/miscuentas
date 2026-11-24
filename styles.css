@@ -214,7 +214,7 @@ svg text { font-family: inherit; }
 .config[open] summary { margin-bottom: 1rem; }
 .config-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 2rem; }
 .ayuda { color: var(--suave); font-size: .85rem; margin: .2rem 0 .7rem; }
-.cfg-fila { display: grid; grid-template-columns: 2.4rem 1fr 5rem auto auto; gap: .4rem; align-items: center; margin-bottom: .45rem; }
+.cfg-fila { display: grid; grid-template-columns: 2.4rem 1fr 3.6rem 7.5rem auto auto; gap: .4rem; align-items: center; margin-bottom: .45rem; }
 .cfg-fila input[type="color"] { padding: 2px; height: 2.3rem; }
 .cfg-fila label { display: flex; align-items: center; gap: .25rem; font-size: .85rem; white-space: nowrap; cursor: pointer; }
 .cfg-fila label input { width: auto; }
@@ -253,8 +253,9 @@ svg text { font-family: inherit; }
   .concepto { grid-template-columns: 1fr 1fr auto; }
   .concepto input[data-c="nombre"] { grid-column: 1 / -1; grid-row: 1; }
   .hbar-fila { grid-template-columns: 85px 1fr 44px; }
-  .cfg-fila { grid-template-columns: 2.4rem 1fr 4.2rem auto; }
-  .cfg-fila label { grid-column: 2 / 4; }
+  .cfg-fila { grid-template-columns: 2.4rem 1fr 3.4rem 6rem; }
+  .cfg-fila input[data-campo="nombre"] { grid-column: 2 / -1; }
+  .cfg-fila label { grid-column: 1 / 4; }
   .meta-config { grid-template-columns: 1fr; }
 }
 

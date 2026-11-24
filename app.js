@@ -83,7 +83,7 @@
   const netoMes = (mes) => totalesNomina(mes).neto;
 
   function calcBolsillo(mes, b) {
-    const asignado = Math.round(netoMes(mes) * b.porcentaje / 100);
+    const asignado = asignadoDe(b, netoMes(mes));
     let ingresos = 0, gastos = 0;
     for (const m of mes.movimientos) {
       if (m.bolsilloId !== b.id) continue;
@@ -101,7 +101,15 @@
     return total;
   }
 
-  const totalPct = () => state.bolsillos.reduce((s, b) => s + (Number(b.porcentaje) || 0), 0);
+  // Un bolsillo se asigna por porcentaje del neto (modo 'pct') o por valor fijo (modo 'valor')
+  const esValor = (b) => b.modo === 'valor';
+  const asignadoDe = (b, neto) => (esValor(b)
+    ? Math.max(0, Math.round(Number(b.valor) || 0))
+    : Math.round(neto * (Number(b.porcentaje) || 0) / 100));
+  const totalAsignado = (lista, neto) => lista.reduce((s, b) => s + asignadoDe(b, neto), 0);
+  const etiquetaBolsillo = (b, neto) => (esValor(b)
+    ? `$${fmtCorto(Number(b.valor) || 0)}`
+    : `${Number(b.porcentaje) || 0}%`);
   const bolsilloPorId = (id) => state.bolsillos.find((b) => b.id === id);
 
   // ---------- Render ----------
@@ -213,11 +221,11 @@
     $('kpiAhorroMes').textContent = fmt(r.ahorro);
     $('kpiAhorroSub').textContent = neto ? `${Math.round((r.ahorro / neto) * 100)}% del neto` : '—';
 
-    const pct = totalPct();
+    const dif = neto - totalAsignado(state.bolsillos, neto);
     const aviso = $('avisoPct');
-    aviso.hidden = pct === 100;
-    if (pct < 100) aviso.textContent = `Tienes ${100 - pct}% del neto sin asignar a ningún bolsillo (${fmt(neto * (100 - pct) / 100)}).`;
-    else if (pct > 100) aviso.textContent = `Los bolsillos suman ${pct}%: estás asignando más de lo que ganas.`;
+    aviso.hidden = !neto || Math.abs(dif) < 1;
+    if (dif >= 1) aviso.textContent = `Tienes ${fmt(dif)} del neto sin asignar a ningún bolsillo (${Math.round((dif / neto) * 100)}%).`;
+    else if (dif <= -1) aviso.textContent = `Los bolsillos suman ${fmt(neto - dif)}: estás asignando ${fmt(-dif)} más de lo que ganas.`;
   }
 
   function renderMeta() {
@@ -272,7 +280,7 @@
       const colorAnillo = b.ahorro ? escapar(b.color) : est.color;
       return `
         <article class="bolsillo ${c.saldo < 0 ? 'sobregirado' : ''}" style="--color:${escapar(b.color)}">
-          <div class="bolsillo-top"><h3>${b.ahorro ? '💾 ' : ''}${escapar(b.nombre)}</h3><span class="chip">${b.porcentaje}%</span></div>
+          <div class="bolsillo-top"><h3>${b.ahorro ? '💾 ' : ''}${escapar(b.nombre)}</h3><span class="chip">${escapar(etiquetaBolsillo(b))}</span></div>
           <div class="bolsillo-cuerpo">
             ${anillo(pct, colorAnillo)}
             <div>
@@ -287,13 +295,14 @@
 
   function renderDistribucion() {
     const neto = netoMes(leerMes(mesActual));
-    const libre = Math.max(0, 100 - totalPct());
-    const partes = state.bolsillos.map((b) => ({ nombre: b.nombre, color: b.color, pct: Number(b.porcentaje) || 0 }));
-    if (libre > 0) partes.push({ nombre: 'Sin asignar', color: '#9ca3af', pct: libre });
-    const total = partes.reduce((s, p) => s + p.pct, 0) || 1;
+    const partes = state.bolsillos.map((b) => ({ nombre: b.nombre, color: b.color, monto: asignadoDe(b, neto) }));
+    const libre = neto - partes.reduce((s, p) => s + p.monto, 0);
+    if (libre >= 1) partes.push({ nombre: 'Sin asignar', color: '#9ca3af', monto: libre });
+    const total = partes.reduce((s, p) => s + p.monto, 0) || 1;
+    partes.forEach((p) => { p.pct = neto ? Math.round((p.monto / neto) * 1000) / 10 : 0; });
     let off = 0;
     const arcos = partes.map((p) => {
-      const len = (p.pct / total) * 100;
+      const len = (p.monto / total) * 100;
       const seg = `<circle cx="100" cy="100" r="72" fill="none" stroke="${escapar(p.color)}" stroke-width="28"
         pathLength="100" stroke-dasharray="${Math.max(0, len - 0.8)} ${100 - Math.max(0, len - 0.8)}" stroke-dashoffset="${-off}"
         transform="rotate(-90 100 100)"><title>${escapar(p.nombre)}: ${p.pct}%</title></circle>`;
@@ -305,7 +314,7 @@
       <text x="100" y="118" text-anchor="middle" class="eje">neto</text>`;
     $('leyendaDistribucion').innerHTML = partes.map((p) => `
       <li><i style="background:${escapar(p.color)}"></i><span>${escapar(p.nombre)}</span><b>${p.pct}%</b>
-      <small>${fmt(neto * p.pct / 100)}</small></li>`).join('');
+      <small>${fmt(p.monto)}</small></li>`).join('');
   }
 
   function renderBarrasBolsillos() {
@@ -463,7 +472,13 @@
       <div class="cfg-fila" data-i="${i}">
         <input type="color" data-campo="color" value="${escapar(b.color)}" aria-label="Color">
         <input type="text" data-campo="nombre" value="${escapar(b.nombre)}" maxlength="30" placeholder="Nombre">
-        <input type="number" data-campo="porcentaje" value="${b.porcentaje}" min="0" max="100" step="1" aria-label="Porcentaje">
+        <select data-campo="modo" aria-label="Tipo de asignación">
+          <option value="pct" ${esValor(b) ? '' : 'selected'}>%</option>
+          <option value="valor" ${esValor(b) ? 'selected' : ''}>$</option>
+        </select>
+        <input type="number" data-campo="cantidad" value="${esValor(b) ? (b.valor || 0) : (b.porcentaje || 0)}"
+          min="0" ${esValor(b) ? 'step="1000"' : 'max="100" step="0.5"'} inputmode="numeric"
+          aria-label="${esValor(b) ? 'Valor fijo' : 'Porcentaje'}" placeholder="${esValor(b) ? 'Valor' : '%'}">
         <label><input type="checkbox" data-campo="ahorro" ${b.ahorro ? 'checked' : ''}> 💾 Ahorro</label>
         <button type="button" class="btn-borrar" data-quitar="${i}" aria-label="Quitar bolsillo">✕</button>
       </div>`).join('');
@@ -471,14 +486,22 @@
   }
 
   function actualizarTotalPct() {
-    const t = borrador.reduce((s, b) => s + (Number(b.porcentaje) || 0), 0);
-    $('totalPct').textContent = `${t}%`;
-    $('totalPct').className = t === 100 ? 'pos' : 'neg';
+    const neto = netoMes(leerMes(mesActual));
+    const t = totalAsignado(borrador, neto);
+    const pct = neto ? Math.round((t / neto) * 1000) / 10 : 0;
+    $('totalPct').textContent = neto ? `${fmt(t)} de ${fmt(neto)} (${pct}%)` : fmt(t);
+    $('totalPct').className = neto && Math.abs(neto - t) < 1 ? 'pos' : 'neg';
   }
 
   function guardarConfig() {
     const limpios = borrador
-      .map((b) => ({ ...b, nombre: b.nombre.trim(), porcentaje: Math.max(0, Number(b.porcentaje) || 0) }))
+      .map((b) => ({
+        ...b,
+        nombre: b.nombre.trim(),
+        modo: esValor(b) ? 'valor' : 'pct',
+        porcentaje: Math.max(0, Number(b.porcentaje) || 0),
+        valor: Math.max(0, Math.round(Number(b.valor) || 0)),
+      }))
       .filter((b) => b.nombre);
     if (!limpios.length) { toast('Debe haber al menos un bolsillo'); return; }
     state.bolsillos = limpios;
@@ -628,8 +651,22 @@
     const campo = e.target.dataset.campo;
     if (!fila || !campo) return;
     const b = borrador[Number(fila.dataset.i)];
+    if (campo === 'modo') {
+      // Convierte el valor actual al nuevo modo usando el neto del mes visible
+      const neto = netoMes(leerMes(mesActual));
+      const monto = asignadoDe(b, neto);
+      b.modo = e.target.value;
+      if (esValor(b)) b.valor = monto;
+      else b.porcentaje = neto ? Math.round((monto / neto) * 1000) / 10 : 0;
+      renderConfig();
+      return;
+    }
+    if (campo === 'cantidad') {
+      if (esValor(b)) b.valor = e.target.value; else b.porcentaje = e.target.value;
+      actualizarTotalPct();
+      return;
+    }
     b[campo] = campo === 'ahorro' ? e.target.checked : e.target.value;
-    if (campo === 'porcentaje') actualizarTotalPct();
   });
 
   $('configBolsillos').addEventListener('click', (e) => {
@@ -640,7 +677,7 @@
   });
 
   $('btnAddBolsillo').addEventListener('click', () => {
-    borrador.push({ id: uid(), nombre: 'Nuevo bolsillo', porcentaje: 0, color: '#64748b', ahorro: false });
+    borrador.push({ id: uid(), nombre: 'Nuevo bolsillo', modo: 'pct', porcentaje: 0, valor: 0, color: '#64748b', ahorro: false });
     renderConfig();
   });
 
