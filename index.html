@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis Cuentas · Salario y bolsillos</title>
+  <meta name="theme-color" content="#0f766e">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>💰 Mis Cuentas</h1>
+    <div class="mes-nav">
+      <button id="mesPrev" class="btn-icon" aria-label="Mes anterior">‹</button>
+      <input type="month" id="mesInput" aria-label="Mes">
+      <button id="mesNext" class="btn-icon" aria-label="Mes siguiente">›</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Salario y resumen -->
+    <section class="card">
+      <div class="nomina-head">
+        <h2>Nómina del mes</h2>
+        <span class="neto">Neto: <strong id="netoTotal">$0</strong></span>
+      </div>
+      <div id="nominaVacia" class="nomina-vacia" hidden>
+        <p>Este mes no tiene nómina registrada.</p>
+        <button id="btnCargarNomina" class="btn" type="button">Cargar nómina</button>
+      </div>
+      <div id="nominaDetalle">
+        <div id="conceptos"></div>
+        <button id="btnAddConcepto" class="btn btn-sec btn-peq" type="button">+ Concepto</button>
+        <div class="nomina-totales">
+          <span>Devengado: <strong id="totDevengado" class="pos">$0</strong></span>
+          <span>Deducciones: <strong id="totDeducciones" class="neg">$0</strong></span>
+        </div>
+      </div>
+      <div class="resumen">
+        <div><small>Asignado</small><strong id="resAsignado">$0</strong></div>
+        <div><small>Gastado</small><strong id="resGastado" class="neg">$0</strong></div>
+        <div><small>Disponible</small><strong id="resDisponible" class="pos">$0</strong></div>
+      </div>
+      <p id="avisoPct" class="aviso" hidden></p>
+    </section>
+
+    <!-- Meta de ahorro -->
+    <section class="card meta">
+      <div class="meta-head">
+        <h2 id="metaTitulo">🏍️ Meta: Moto</h2>
+        <span id="metaPct">0%</span>
+      </div>
+      <div class="barra"><div id="metaBarra" class="barra-fill"></div></div>
+      <p class="meta-info"><span id="metaAhorrado">$0</span> de <span id="metaMonto">$0</span> · Faltan <strong id="metaFalta">$0</strong></p>
+    </section>
+
+    <!-- Bolsillos -->
+    <section>
+      <h2 class="titulo">Bolsillos</h2>
+      <div id="bolsillos" class="grid"></div>
+    </section>
+
+    <!-- Nuevo movimiento -->
+    <section class="card">
+      <h2>Registrar movimiento</h2>
+      <form id="formMov" class="form-mov">
+        <div class="tipo-toggle">
+          <label><input type="radio" name="tipo" value="gasto" checked> Gasto</label>
+          <label><input type="radio" name="tipo" value="ingreso"> Ingreso extra</label>
+        </div>
+        <select id="movBolsillo" required aria-label="Bolsillo"></select>
+        <input type="number" id="movMonto" min="1" step="1" inputmode="numeric" placeholder="Monto" required>
+        <input type="text" id="movDesc" maxlength="80" placeholder="Descripción (ej: pasajes, almuerzo)">
+        <input type="date" id="movFecha" required aria-label="Fecha">
+        <button type="submit" class="btn">Agregar</button>
+      </form>
+    </section>
+
+    <!-- Movimientos -->
+    <section class="card">
+      <div class="movs-head">
+        <h2>Movimientos del mes</h2>
+        <select id="filtroBolsillo" aria-label="Filtrar por bolsillo"></select>
+      </div>
+      <ul id="listaMovs" class="lista"></ul>
+      <p id="sinMovs" class="vacio">Aún no hay movimientos este mes.</p>
+    </section>
+
+    <!-- Configuración -->
+    <details class="card config">
+      <summary>⚙️ Configurar bolsillos y meta</summary>
+      <p class="ayuda">Cada bolsillo recibe un porcentaje del salario. Marca 💾 los bolsillos de ahorro: su saldo suma a la meta.</p>
+      <div id="configBolsillos"></div>
+      <button id="btnAddBolsillo" class="btn btn-sec" type="button">+ Agregar bolsillo</button>
+      <p class="total-pct">Total asignado: <strong id="totalPct">0%</strong></p>
+      <div class="meta-config">
+        <label>Nombre de la meta <input type="text" id="cfgMetaNombre" maxlength="40"></label>
+        <label>Monto de la meta <input type="number" id="cfgMetaMonto" min="0" step="1000" inputmode="numeric"></label>
+      </div>
+      <button id="btnGuardarCfg" class="btn" type="button">Guardar configuración</button>
+
+      <hr>
+      <h3>Respaldo</h3>
+      <p class="ayuda">Los datos se guardan solo en este navegador. Exporta un respaldo de vez en cuando.</p>
+      <div class="acciones">
+        <button id="btnExport" class="btn btn-sec" type="button">⬇️ Exportar JSON</button>
+        <label class="btn btn-sec">⬆️ Importar JSON<input type="file" id="fileImport" accept="application/json" hidden></label>
+        <button id="btnReset" class="btn btn-peligro" type="button">🗑️ Borrar todo</button>
+      </div>
+    </details>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
